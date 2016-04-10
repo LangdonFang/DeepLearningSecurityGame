@@ -27,12 +27,7 @@ var lastReward = 0;
 
 //----- End of Global variables -------//
 
-function start() {
-	// Reinitalize all global variables	
-	DefenderUtilities = [];
-	AttackerUtilities = [];
-	lastReward = 0;
-	
+function firstStart(){
 	//Solve the orginal problem (checking to see if we learn correctly)
 	LPSolver();
 	// Creating the learning chart
@@ -43,6 +38,15 @@ function start() {
 	(actionChart = new Graph("updating-action","legend-action")).create();
 	// Creating error graph
 	(errorChart = new Graph("updating-error","legend-error")).createError();
+	
+	start();
+}
+
+function start() {
+	// Reinitalize all global variables	
+	DefenderUtilities = [];
+	AttackerUtilities = [];
+	lastReward = 0;
 	
 	document.getElementById("utilitesText").innerHTML = printUtilities(Utilities); 
 	
@@ -283,6 +287,16 @@ function stopInterval()
 
 function restart(){
 	stopInterval();
+	// Clearing off all of the graph's data
+	rewardChart.restart();
+	rewardChart.create();
+	
+	actionChart.restart();
+	actionChart.create();
+	
+	errorChart.restart();
+	errorChart.createError();
+	// Starting again
 	start();
 }
 
@@ -337,13 +351,13 @@ function printSolutions(values)
 function Graph(name,legend){
 	this.name = name;
 	this.chart;
-	this.latestChartLabel = 0;
 	this.legend = legend;
 	this.changeGraphCounter = 0;
 	this.attackCount = 0;
 	this.defenderCount = 0;
 	this.lastCount = 0;
 	this.slope = 0;
+	this.latestChartLabel = 0;
 }
 
 Graph.prototype.create = function() {
@@ -450,4 +464,14 @@ Graph.prototype.changeGraphError = function(value) {
 		this.chart.addData([this.defenderCount], label);
 	}
 	this.lastCount = this.defenderCount;
+}
+
+Graph.prototype.restart = function(value) {
+	this.chart.destroy();
+	this.changeGraphCounter = 0;
+	this.attackCount = 0;
+	this.defenderCount = 0;
+	this.lastCount = 0;
+	this.slope = 0;
+	this.latestChartLabel = 0;
 }
