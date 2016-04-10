@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Deep Q Learning for Stackelburg games</title>
+ 
+<!-- CSS goes here -->
+<style>
+body {
+  background-color: #FFF; /* example... */
+}
+</style>
+
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" 
+		integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" 
+		crossorigin="anonymous">
+ 
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+ 
+<!-- import rl.js library -->
+<script src="http://cs.stanford.edu/people/karpathy/convnetjs/build/util.js"></script>
+<script src="http://cs.stanford.edu/people/karpathy/convnetjs/build/vis.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.0.0/math.min.js"></script>
+<script src="reinforcejs/lib/rl.js"></script>
+<script src="simplex/src/solver.js"></script>
+ 
+<!-- Charts for visualization --> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/1.0.2/Chart.min.js"></script>
+
+<script src="code.js"></script>
+ 
+<!-- javascript goes here -->
+<script type="text/javascript">
+
+</script>
+</head>
+ 
+<body onload="start()">
+<div class="row" style="padding-left:1cm;padding-top:0cm;">
+<h1>Control Panel</h1>
+<button type="button" id="clickstart" class="btn btn-success" onclick="startInterval();" />Start</button>
+<button type="button" id="clickstop" class="btn btn-danger" onclick="stopInterval();" />Stop</button>
+<button type="button" id="clickstart" class="btn btn-warning" onclick="restart();" />Restart</button>
+<!-- Button trigger modal -->
+<button type="button" class="btn btn-info" data-toggle="modal" data-target="#utilitiesModal">Utilities</button>
+</div>
+<div class="row">
+  <div class="col-md-4">
+  	<h3>Learning Graph</h3>
+  	<canvas id="learning" width="400" height="400"></canvas>
+  	<p id="learningtext"></p>
+  </div>
+  <div class="col-md-4">
+  	<h3>Solution Graph</h3>
+  	<canvas id="solution" width="400" height="400"></canvas>
+  	<p id="solutiontext"></p>
+  </div>
+  <div class="col-md-4">
+  	<h3>Reward Line Graph</h3>
+  	<canvas id="updating-reward" width="500" height="400"></canvas>
+  	<div id="legend-reward" style="float:right;width=100%;text-align: left"></div>
+  </div>
+</div>
+<div class="row">
+  <div class="col-md-4">
+  	<h3>Action Line Graph</h3>
+  	<canvas id="updating-action" width="500" height="400"></canvas>
+  	<div id="legend-action" style="float:right;width=100%;text-align: left"></div>
+  </div>
+</div>
+
+
+<!-- Modal -->
+<div class="modal fade" id="utilitiesModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Utilities for 
+        						<span style="background-color:#d9edf7;">Defender</span> and 
+        						<span style="background-color:#FFDDDD;">Attacker</span></h4>
+      </div>
+      <div class="modal-body">
+        <div id="utilitesText"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" 
+		integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" 
+		crossorigin="anonymous"></script>
+</body>
+</html>
