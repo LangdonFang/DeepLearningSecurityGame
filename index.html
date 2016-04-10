@@ -41,8 +41,8 @@ body {
 <button type="button" id="clickstart" class="btn btn-success" onclick="startInterval();" />Start</button>
 <button type="button" id="clickstop" class="btn btn-danger" onclick="stopInterval();" />Stop</button>
 <button type="button" id="clickstart" class="btn btn-warning" onclick="restart();" />Restart</button>
-<!-- Button trigger modal -->
 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#utilitiesModal">Utilities</button>
+<button type="button" class="btn btn-info" data-toggle="modal" data-target="#solutionModal">LP Solutions</button>
 </div>
 <div class="row">
   <div class="col-md-4">
@@ -63,9 +63,14 @@ body {
 </div>
 <div class="row">
   <div class="col-md-4">
-  	<h3>Action Line Graph</h3>
+  	<h3>Action Graph</h3>
   	<canvas id="updating-action" width="500" height="400"></canvas>
   	<div id="legend-action" style="float:right;width=100%;text-align: left"></div>
+  </div>
+  <div class="col-md-4">
+  	<h3>Error Graph</h3>
+  	<canvas id="updating-error" width="500" height="400"></canvas>
+  	<div id="legend-error" style="float:right;width=100%;text-align: left"></div>
   </div>
 </div>
 
@@ -86,6 +91,24 @@ body {
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
         <button type="button" class="btn btn-primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="solutionModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Solutions for LP's</h4>
+      </div>
+      <div class="modal-body">
+        <div id="solutionModalText"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
       </div>
     </div>
   </div>

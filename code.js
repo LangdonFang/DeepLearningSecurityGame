@@ -1,38 +1,48 @@
 //----- Global variables -------//
 // Charts
-var RadarChart, rewardChart, actionChart;
-// line chart data
+var RadarChart, rewardChart, actionChart, errorChart;
+// Learning agent
 var agent;
+// Individual utilties
 var DefenderUtilities = [];
 var AttackerUtilities = [];
 
+// Full utility table
 /*
 var Utilities = [[100,0,-700,700],
 				[-100,100,100,-200]];
-	
-*/
+	*/
 
-var Utilities = [[0,0,-1,1,1,-3],
+var Utilities = [[0,0,-1,1,1,-1],
 				 [1,-1,0,0,-1,1],
 				 [-1,1,1,-3,0,0]];
-	
-	
-				
+					
 var Interval;
+var IntervalTime = 0;
+
+//Defender Solutions for error checking
+var Solution = [];
 
 var lastReward = 0;
 
 //----- End of Global variables -------//
 
 function start() {
+	// Reinitalize all global variables	
+	DefenderUtilities = [];
+	AttackerUtilities = [];
+	lastReward = 0;
+	
 	//Solve the orginal problem (checking to see if we learn correctly)
 	LPSolver();
 	// Creating the learning chart
 	learningChart();
 	// Creating reward graph
-	rewardChart = new Graph("updating-reward","legend-reward");
+	(rewardChart = new Graph("updating-reward","legend-reward")).create();
 	// Creating action graph
-	actionChart = new Graph("updating-action","legend-action");
+	(actionChart = new Graph("updating-action","legend-action")).create();
+	// Creating error graph
+	(errorChart = new Graph("updating-error","legend-error")).createError();
 	
 	document.getElementById("utilitesText").innerHTML = printUtilities(Utilities); 
 	
@@ -52,14 +62,11 @@ function start() {
 	spec.epsilon = 0.2; // initial epsilon for epsilon-greedy policy, [0, 1)
 	spec.alpha = 0.0001; // value function learning rate
 	spec.experience_add_every = 1; // number of time steps before we add another experience to replay memory
-	spec.experience_size = 100; // size of experience replay memory
+	spec.experience_size = 1000; // size of experience replay memory
 	spec.learning_steps_per_iteration = 20; //20
 	spec.tderror_clamp = 1.0; // for robustness
 	spec.num_hidden_units = 100; // number of neurons in hidden layer
 	agent = new RL.DQNAgent(env, spec); 
-	
-	DefenderUtilities = [];
-	AttackerUtilities = [];
 	
 	for(var i=0; i<Utilities.length; ++i){
 		for(var j=0; j<Utilities.length; ++j){
@@ -79,9 +86,16 @@ function startInterval(){
 		var action = Number(agent.actRandom(enterValues));
 		var actionProb = agent.amat["w"];
 		
-		//Updating Chart
+		//Updating Action Probability Chart
 		changeRadarChart(actionProb);
 		document.getElementById("learningtext").innerText = printArray(actionProb); 
+		
+		//Updating error chart
+		var error = Math.abs(math.sum(...actionProb)-math.sum(...Solution));
+		for(var i=0; i<actionProb.length; ++i){
+			error += Math.abs(actionProb[i]-Solution[i]);
+		}
+	  	errorChart.changeGraphError(error);
 		
 		//Get attackers action
 		// Check if probabilites are all zero than split evenly
@@ -135,7 +149,7 @@ function startInterval(){
 		}
 	  	// execute action in environment and get the reward
 	  	agent.learn(NewValue); // the agent improves its Q,policy,model, etc. reward is a float
-	},  0);
+	},  IntervalTime);
 }
 
 function LPSolver()
@@ -192,8 +206,13 @@ function LPSolver()
 	for(var i=0; i<Utilities.length; ++i){
 		chartArray.push(solutions[maxI][String("x"+(i+1))]);
 	}
+	// Saving the solution for error checking
+	Solution = chartArray.slice();
+	// Displaying the solution radar
 	answerChart(chartArray);
+	// Printing the models for the user
 	document.getElementById("solutiontext").innerText = printArray(chartArray); 
+	document.getElementById("solutionModalText").innerHTML = printSolutions(solutions);
 }
 
 function learningChart(){
@@ -295,6 +314,26 @@ function printUtilities(values)
 	return str;
 }
 
+function printSolutions(values)
+{
+	var str = "<div class=\"table-responsive\"><table class=\"table\"><tr>";
+	str += "<th>Max</td>"
+	for(var i=0; i<Utilities.length; ++i){
+		str += "<th>Target "+(i+1)+"</th>";
+	}
+	str += "</tr>";
+	for(var i=0; i<values.length; ++i){
+		str += "<tr>";
+		str += "<td>"+values[i].max.toFixed(4)+"</td>";
+		for(var j=0; j<Utilities.length; ++j){
+			str += "<td>P("+values[i][String("x"+(j+1))].toFixed(4)+")</td>";
+		}
+		str += "</tr>";
+	}
+	str += "</table></div>";
+	return str;
+}
+
 function Graph(name,legend){
 	this.name = name;
 	this.chart;
@@ -303,7 +342,8 @@ function Graph(name,legend){
 	this.changeGraphCounter = 0;
 	this.attackCount = 0;
 	this.defenderCount = 0;
-	this.create();
+	this.lastCount = 0;
+	this.slope = 0;
 }
 
 Graph.prototype.create = function() {
@@ -335,7 +375,33 @@ Graph.prototype.create = function() {
     	{legendTemplate : "<ul style=\"list-style-type:none\"><% for (var i=0; i<datasets.length; i++){%>"+
     						"<li><span style=\"background-color:<%=datasets[i].pointColor%>\">"+
     						"<%if(datasets[i].label){%><%=datasets[i].label%><%}%></span>"+
-    						"</li><%}%></ul>"});
+    						"</li><%}%></ul>", animation : false});
+    var legendtext = this.chart.generateLegend();
+    document.getElementById(this.legend).innerHTML = legendtext;
+}
+
+Graph.prototype.createError = function() {
+	var canvas = document.getElementById(this.name),
+    ctx = canvas.getContext('2d'),
+    startingData = {
+      labels: [1],
+      datasets: [
+          {
+          	  label: "Defender Error",
+          	  fillColor: "rgba(151,187,205,0.2)",
+              strokeColor: "rgba(151,187,205,1)",
+              pointColor: "rgba(151,187,205,1)",
+              pointStrokeColor: "#fff",
+              data: [this.attackCount]
+          }
+      ]
+    };
+    this.latestChartLabel = startingData.labels[0];
+    this.chart = new Chart(ctx).Line(startingData,
+    	{legendTemplate : "<ul style=\"list-style-type:none\"><% for (var i=0; i<datasets.length; i++){%>"+
+    						"<li><span style=\"background-color:<%=datasets[i].pointColor%>\">"+
+    						"<%if(datasets[i].label){%><%=datasets[i].label%><%}%></span>"+
+    						"</li><%}%></ul>",animation : false, pointDot : false, showTooltips: false, scaleShowVerticalLines: false});
     var legendtext = this.chart.generateLegend();
     document.getElementById(this.legend).innerHTML = legendtext;
 }
@@ -367,4 +433,21 @@ Graph.prototype.changeGraphAction = function(values) {
 		if(this.changeGraphCounter>10)
 			this.chart.removeData();
 	}
+}
+
+Graph.prototype.changeGraphError = function(value) {
+	++this.latestChartLabel;
+	this.defenderCount = value;
+	// Add numbers for each dataset
+	var yAxisSlope = this.defenderCount-this.lastCount;
+	if(this.latestChartLabel < 3000 && 
+		(Math.sign(this.slope)!=Math.sign(yAxisSlope) ||
+		  this.latestChartLabel%100==0)) {
+		this.slope = yAxisSlope;
+		var label = "";
+		if(this.latestChartLabel%100==0)
+			label = this.latestChartLabel;
+		this.chart.addData([this.defenderCount], label);
+	}
+	this.lastCount = this.defenderCount;
 }
