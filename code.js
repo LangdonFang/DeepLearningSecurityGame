@@ -1,6 +1,6 @@
 //----- Global variables -------//
 // Charts
-var RadarChart, rewardChart, actionChart, errorChart;
+var RadarChart, SolutionChart, rewardChart, actionChart, errorChart;
 // Learning agent
 var agent;
 // Individual utilties
@@ -11,12 +11,12 @@ var AttackerUtilities = [];
 /*
 var Utilities = [[100,0,-700,700],
 				[-100,100,100,-200]];
-	*/
+*/
 
 var Utilities = [[0,0,-1,1,1,-1],
 				 [1,-1,0,0,-1,1],
 				 [-1,1,1,-3,0,0]];
-					
+
 var Interval;
 var IntervalTime = 0;
 
@@ -54,7 +54,7 @@ function start() {
 	var env = {};
 	// Total Utilities and last reward 
 	var numUtil = Utilities.length;
-	env.getNumStates = function() { return numUtil*numUtil+2; }
+	env.getNumStates = function() { return numUtil*numUtil+1; }
 	env.getMaxNumActions = function() { return numUtil; }
 	
 	// create the agent, yay!
@@ -64,6 +64,7 @@ function start() {
 	// Checking discount (was .9)
 	spec.gamma = .9; // discount factor, [0, 1)
 	spec.epsilon = 0.2; // initial epsilon for epsilon-greedy policy, [0, 1)
+	spec.tau = .9; // Initial weight of temperature of probabilities (.9)
 	spec.alpha = 0.0001; // value function learning rate
 	spec.experience_add_every = 1; // number of time steps before we add another experience to replay memory
 	spec.experience_size = 1000; // size of experience replay memory
@@ -72,12 +73,7 @@ function start() {
 	spec.num_hidden_units = 100; // number of neurons in hidden layer
 	agent = new RL.DQNAgent(env, spec); 
 	
-	for(var i=0; i<Utilities.length; ++i){
-		for(var j=0; j<Utilities.length; ++j){
-			DefenderUtilities.push(Utilities[i][j*2]);
-			AttackerUtilities.push(Utilities[i][j*2+1]);
-		}
-	}
+	updateUtilities();
 	
 	startInterval();
 }
@@ -86,12 +82,11 @@ function startInterval(){
 	Interval = setInterval(function(){ // start the learning loop
 		var enterValues = DefenderUtilities.slice();
 		enterValues.push(lastReward);
-		enterValues.push(rewardChart.defenderCount);
 		var action = Number(agent.actRandom(enterValues));
 		var actionProb = agent.amat["w"];
 		
 		//Updating Action Probability Chart
-		changeRadarChart(actionProb);
+		changeRadarChart(LearningChart, actionProb);
 		document.getElementById("learningtext").innerText = printArray(actionProb); 
 		
 		//Updating error chart
@@ -213,7 +208,11 @@ function LPSolver()
 	// Saving the solution for error checking
 	Solution = chartArray.slice();
 	// Displaying the solution radar
-	answerChart(chartArray);
+	if(typeof SolutionChart !== 'undefined'){
+		changeRadarChart(SolutionChart, chartArray);
+	} else {
+		answerChart(chartArray);
+	}
 	// Printing the models for the user
 	document.getElementById("solutiontext").innerText = printArray(chartArray); 
 	document.getElementById("solutionModalText").innerHTML = printSolutions(solutions);
@@ -240,7 +239,7 @@ function learningChart(){
 	        }
 		    ]
 	};
-	RadarChart = new Chart(ctx).Radar(data, {
+	LearningChart = new Chart(ctx).Radar(data, {
 	    pointDot: false
 	});
 }
@@ -264,20 +263,20 @@ function answerChart(array){
 	        }
 		    ]
 	};
-	RadarChart = new Chart(ctx).Radar(data, {
+	SolutionChart = new Chart(ctx).Radar(data, {
 	    pointDot: false
 	});
 }
 
-function changeRadarChart(values)
+function changeRadarChart(chart, values)
 {
 	if(values.length<3) {
 		values[2]= 0;
 	}
 	for(var i=0; i<values.length; i++){
-		RadarChart.datasets[0].points[i].value = values[i];
+		chart.datasets[0].points[i].value = values[i];
 	}
-	RadarChart.update();
+	chart.update();
 }
 
 function stopInterval()
@@ -296,8 +295,26 @@ function restart(){
 	
 	errorChart.restart();
 	errorChart.createError();
+	
 	// Starting again
 	start();
+}
+
+function setUtility(i, j, value){
+	if(!isNaN(value)){
+		Utilities[i][j] = Number(value);
+	}
+	LPSolver();
+	updateUtilities();
+}
+
+function updateUtilities(){
+	for(var i=0; i<Utilities.length; ++i){
+		for(var j=0; j<Utilities.length; ++j){
+			DefenderUtilities.push(Utilities[i][j*2]);
+			AttackerUtilities.push(Utilities[i][j*2+1]);
+		}
+	}
 }
 
 function printArray(values)
@@ -311,16 +328,18 @@ function printArray(values)
 
 function printUtilities(values)
 {
-	var str = "<div class=\"table-responsive\"><table class=\"table\"><tr>";
+	var str = "<div class=\"table-responsive\"><table class=\"table\"><tr><th></th>";
 	for(var i=0; i<values.length; ++i){
 		str += "<th colspan=\"2\">Target "+(i+1)+"</th>";
 	}
 	str += "</tr>";
 	for(var i=0; i<values.length; ++i){
 		str += "<tr>";
+		str += "<th>Target "+(i+1)+"</th>";
 		for(var j=0; j<values.length*2; ++j){
 			var temp = (j%2==0)?"class=\"info\"":"class=\"danger\"";
-			str += "<td "+temp+">"+values[i][j]+"</td>";
+			str += "<td "+temp+">";
+			str += "<input maxlength=\"5\" size=\"4\" onchange=\"setUtility("+i+","+j+",this.value)\" value='"+values[i][j]+"\'></td>";
 		}
 		str += "</tr>";
 	}
