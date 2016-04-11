@@ -8,15 +8,15 @@ var DefenderUtilities = [];
 var AttackerUtilities = [];
 
 // Full utility table
-/*
+
 var Utilities = [[100,0,-700,700],
 				[-100,100,100,-200]];
-*/
 
+/*
 var Utilities = [[0,0,-1,1,1,-1],
 				 [1,-1,0,0,-1,1],
 				 [-1,1,1,-3,0,0]];
-
+*/
 var Interval;
 var IntervalTime = 0;
 
@@ -54,7 +54,7 @@ function start() {
 	var env = {};
 	// Total Utilities and last reward 
 	var numUtil = Utilities.length;
-	env.getNumStates = function() { return numUtil*numUtil+1; }
+	env.getNumStates = function() { return numUtil*numUtil+2; }
 	env.getMaxNumActions = function() { return numUtil; }
 	
 	// create the agent, yay!
@@ -67,7 +67,7 @@ function start() {
 	spec.tau = .9; // Initial weight of temperature of probabilities (.9)
 	spec.alpha = 0.0001; // value function learning rate
 	spec.experience_add_every = 1; // number of time steps before we add another experience to replay memory
-	spec.experience_size = 1000; // size of experience replay memory
+	spec.experience_size = 100; // size of experience replay memory
 	spec.learning_steps_per_iteration = 20; //20
 	spec.tderror_clamp = 1.0; // for robustness
 	spec.num_hidden_units = 100; // number of neurons in hidden layer
@@ -82,6 +82,7 @@ function startInterval(){
 	Interval = setInterval(function(){ // start the learning loop
 		var enterValues = DefenderUtilities.slice();
 		enterValues.push(lastReward);
+		enterValues.push(rewardChart.defenderCount)
 		var action = Number(agent.actRandom(enterValues));
 		var actionProb = agent.amat["w"];
 		
