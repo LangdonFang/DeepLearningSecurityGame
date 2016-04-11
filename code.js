@@ -2,7 +2,7 @@
 // Charts
 var RadarChart, SolutionChart, rewardChart, actionChart, errorChart;
 // Learning agent
-var agent;
+var agent, tauLearner;
 // Individual utilties
 var DefenderUtilities = [];
 var AttackerUtilities = [];
@@ -22,8 +22,8 @@ var IntervalTime = 0;
 
 //Defender Solutions for error checking
 var Solution = [];
-
 var lastReward = 0;
+var tauValue = .9;
 
 //----- End of Global variables -------//
 
@@ -65,13 +65,31 @@ function start() {
 	spec.gamma = .9; // discount factor, [0, 1)
 	spec.epsilon = 0.2; // initial epsilon for epsilon-greedy policy, [0, 1)
 	spec.tau = .9; // Initial weight of temperature of probabilities (.9)
-	spec.alpha = 0.0001; // value function learning rate
+	spec.alpha = 0.00001; // value function learning rate
 	spec.experience_add_every = 1; // number of time steps before we add another experience to replay memory
 	spec.experience_size = 100; // size of experience replay memory
-	spec.learning_steps_per_iteration = 20; //20
+	spec.learning_steps_per_iteration = 1; //20
 	spec.tderror_clamp = 1.0; // for robustness
 	spec.num_hidden_units = 100; // number of neurons in hidden layer
 	agent = new RL.DQNAgent(env, spec); 
+	
+	// Creating the tau learner for controlling the temperature
+	var tauEnv = {};
+	var numProb = numUtil;
+	//Add two for last action and last reward
+	tauEnv.getNumStates = function() { return numProb+3; };
+	tauEnv.getMaxNumActions = function() { return 1; };
+	var tauSpec = {};
+	tauSpec.update = 'qlearn'; // qlearn | sarsa
+	tauSpec.gamma = .9; // discount factor, [0, 1)
+	tauSpec.alpha = 0.001;
+	tauSpec.epsilon = 0;
+	tauSpec.experience_add_every = 1; // number of time steps before we add another experience to replay memory
+	tauSpec.experience_size = 100; // size of experience replay memory
+	tauSpec.learning_steps_per_iteration = 1; //20
+	tauSpec.tderror_clamp = 1.0; // for robustness
+	tauSpec.num_hidden_units = 100; // number of neurons in hidden layer
+	tauLearner = new RL.DQNAgent(tauEnv,tauSpec);
 	
 	updateUtilities();
 	
@@ -83,6 +101,7 @@ function startInterval(){
 		var enterValues = DefenderUtilities.slice();
 		enterValues.push(lastReward);
 		enterValues.push(rewardChart.defenderCount)
+		enterValues.push(tauValue);
 		var action = Number(agent.actRandom(enterValues));
 		var actionProb = agent.amat["w"];
 		
@@ -137,18 +156,27 @@ function startInterval(){
 	  	actionValues.push((attackAction+1));
 	  	actionChart.changeGraphAction(actionValues);
 	  	
-	  	lastReward = reward;
 	  	var OldMax = Math.max(Math.abs(Math.min(...DefenderUtilities)),
 	  							Math.abs(Math.max(...DefenderUtilities)));
 	  	var OldMin = -OldMax;
-	  		OldRange = (OldMax - OldMin), NewValue = -1, NewRange = 0;
+	  		OldRange = (OldMax - OldMin), NewReward = -1, NewRange = 0;
 	  	var newMax = 1; newMin = -1;
 		if (OldRange != 0) {
 		    NewRange = (newMax - newMin);  
-		    NewValue = (((reward - OldMin) * NewRange) / OldRange) + newMin;
+		    NewReward = (((reward - OldMin) * NewRange) / OldRange) + newMin;
 		}
 	  	// execute action in environment and get the reward
-	  	agent.learn(NewValue); // the agent improves its Q,policy,model, etc. reward is a float
+	  	agent.learn(NewReward); // the agent improves its Q,policy,model, etc. reward is a float
+	  	
+	  	//--- Now we focus on tau learner --//
+	  	var input = [...actionProb, action, lastReward];
+	  	var simpleAction = tauLearner.act(input);
+	  	tauLearner.learn(NewReward);
+	  	tauValue = Math.max(.01,Math.abs(tauLearner.amat["w"][0]));
+	  	console.log(tauValue);
+	  	agent.tau = tauValue;
+	  	//--- Done with tau learner --/
+	  	lastReward = NewReward;
 	},  IntervalTime);
 }
 
