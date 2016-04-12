@@ -1,6 +1,6 @@
 //----- Global variables -------//
 // Charts
-var RadarChart, SolutionChart, rewardChart, actionChart, errorChart;
+var RadarChart, SolutionChart, rewardChart, actionChart, errorChart, rewardDiffChart;
 // Learning agent
 var agent, tauLearner;
 // Individual utilties
@@ -8,15 +8,26 @@ var DefenderUtilities = [];
 var AttackerUtilities = [];
 
 // Full utility table
-
+/*
 var Utilities = [[100,0,-700,700],
 				[-100,100,100,-200]];
-
+*/
 /*
 var Utilities = [[0,0,-1,1,1,-1],
 				 [1,-1,0,0,-1,1],
 				 [-1,1,1,-3,0,0]];
 */
+/*
+var Utilities = [[100,0,-700,700,100,200],
+				[-100,100,100,-200,-100,100],
+				[-100,100,100,-200,100,0]];
+				*/
+				
+var Utilities = [[100,-200,-700,700,100,-200],
+				[-100,-100,100,-200,-100,-100],
+				[-100,-100,100,-200,100,-200]];
+				
+
 var Interval;
 var IntervalTime = 0;
 
@@ -33,11 +44,13 @@ function firstStart(){
 	// Creating the learning chart
 	learningChart();
 	// Creating reward graph
-	(rewardChart = new Graph("updating-reward","legend-reward")).create();
+	(rewardChart = new Graph("updating-reward","legend-reward")).create("Defender","Optimal Defender");
 	// Creating action graph
-	(actionChart = new Graph("updating-action","legend-action")).create();
+	(actionChart = new Graph("updating-action","legend-action")).create("Defender","Attacker");
 	// Creating error graph
 	(errorChart = new Graph("updating-error","legend-error")).createError();
+	// Creating reward difference chart
+	(rewardDiffChart = new Graph("updating-rewardDiff","legend-rewardDiff")).createError();
 	
 	start();
 }
@@ -54,7 +67,7 @@ function start() {
 	var env = {};
 	// Total Utilities and last reward 
 	var numUtil = Utilities.length;
-	env.getNumStates = function() { return numUtil*numUtil+2; }
+	env.getNumStates = function() { return numUtil*numUtil+3; }
 	env.getMaxNumActions = function() { return numUtil; }
 	
 	// create the agent, yay!
@@ -63,7 +76,6 @@ function start() {
 	spec.update = 'qlearn'; // qlearn | sarsa
 	// Checking discount (was .9)
 	spec.gamma = .9; // discount factor, [0, 1)
-	spec.epsilon = 0.2; // initial epsilon for epsilon-greedy policy, [0, 1)
 	spec.tau = .9; // Initial weight of temperature of probabilities (.9)
 	spec.alpha = 0.00001; // value function learning rate
 	spec.experience_add_every = 1; // number of time steps before we add another experience to replay memory
@@ -81,13 +93,12 @@ function start() {
 	tauEnv.getMaxNumActions = function() { return 1; };
 	var tauSpec = {};
 	tauSpec.update = 'qlearn'; // qlearn | sarsa
-	tauSpec.gamma = .9; // discount factor, [0, 1)
+	tauSpec.gamma = .1; // discount factor, [0, 1)
 	tauSpec.alpha = 0.001;
-	tauSpec.epsilon = 0;
 	tauSpec.experience_add_every = 1; // number of time steps before we add another experience to replay memory
 	tauSpec.experience_size = 100; // size of experience replay memory
 	tauSpec.learning_steps_per_iteration = 1; //20
-	tauSpec.tderror_clamp = 1.0; // for robustness
+	tauSpec.tderror_clamp = 1; // for robustness
 	tauSpec.num_hidden_units = 100; // number of neurons in hidden layer
 	tauLearner = new RL.DQNAgent(tauEnv,tauSpec);
 	
@@ -116,45 +127,36 @@ function startInterval(){
 		}
 	  	errorChart.changeGraphError(error);
 		
-		//Get attackers action
-		// Check if probabilites are all zero than split evenly
-		var sum = math.sum(...actionProb);
-		if(sum==0) {
-			for(var i=0; i<actionProb.length; ++i)
-				actionProb[i] = 1/actionProb.length;
-		}
 		//var attackAction = Math.floor(Math.random() * (Utilities.length));
-		var attackAction = 0;
-		var attackMax = 0;
-		for(var i=0; i<Utilities.length; ++i){
-			var tempMax = 0.0;
-			for(var j=0; j<Utilities.length; ++j){
-				tempMax += Utilities[j][i*2+1]*actionProb[j];
-			}
-			if(attackAction == -1 || tempMax > attackMax) {
-				attackAction = i;
-				attackMax = tempMax;
-			} else if(tempMax==attackMax){
-				var coinflip = Math.floor(Math.random() * (2));
-				if(coinflip==0){
-					attackAction = i;
-					attackMax = tempMax;
-				}
-			}
-		}
 		
+		//Get attackers action
+		var attackAction = attackerAction(actionProb);
+		var optimalAttackAction = attackerAction(Solution);
+		
+		//Optimal solution action
+		var sum=0, r=Math.random(), optimalAction=0;
+		for (var i in Solution) {
+		  sum += Solution[i];
+		  if (r <= sum) {
+			optimalAction = i;
+			break;
+		  }
+		}
 		
 		var rewardValues = [], actionValues = [];
 		//Lets get reward for defender
 	  	var reward = Utilities[action][attackAction*2];
-	  	// Reward graph defender than attacker
 	  	rewardValues.push(reward);
-	  	rewardValues.push(Utilities[action][attackAction*2+1]);
+		//Geting reward for attack
+	  	//rewardValues.push(Utilities[action][attackAction*2+1]);
+	  	rewardValues.push(Utilities[optimalAction][optimalAttackAction*2]);
 	  	rewardChart.changeGraphReward(rewardValues);
 	  	// Action graph defender than attacker
 	  	actionValues.push((action+1));
 	  	actionValues.push((attackAction+1));
 	  	actionChart.changeGraphAction(actionValues);
+	  	
+	  	rewardDiffChart.changeGraphError(rewardChart.defenderCount - rewardChart.attackCount);
 	  	
 	  	var OldMax = Math.max(Math.abs(Math.min(...DefenderUtilities)),
 	  							Math.abs(Math.max(...DefenderUtilities)));
@@ -172,12 +174,42 @@ function startInterval(){
 	  	var input = [...actionProb, action, lastReward];
 	  	var simpleAction = tauLearner.act(input);
 	  	tauLearner.learn(NewReward);
-	  	tauValue = Math.max(.01,Math.abs(tauLearner.amat["w"][0]));
-	  	console.log(tauValue);
+	  	tauValue = Math.max(.001,Math.abs(tauLearner.amat["w"][0]));
+	  	//tauValue = Math.max(.001, Math.pow(Math.E,tauLearner.amat["w"][0]*tauLearner.amat["w"][0])-1);
+	  	//console.log(tauValue);
 	  	agent.tau = tauValue;
+	  	//agent.tau = .001;
 	  	//--- Done with tau learner --/
 	  	lastReward = NewReward;
 	},  IntervalTime);
+}
+
+function attackerAction(actionProb)
+{
+	// Check if probabilites are all zero than split evenly
+	var sum = math.sum(...actionProb);
+	if(sum==0) {
+		for(var i=0; i<actionProb.length; ++i)
+			actionProb[i] = 1/actionProb.length;
+	}
+	var attackAction = 0;
+	var attackMax = 0;
+	for(var i=0; i<Utilities.length; ++i){
+		var tempMax = 0.0;
+		for(var j=0; j<Utilities.length; ++j){
+			tempMax += Utilities[j][i*2+1]*actionProb[j];
+		}
+		if(attackAction == -1 || tempMax > attackMax) {
+			attackAction = i;
+			attackMax = tempMax;
+		} else if(tempMax==attackMax){
+			if(Utilities[action][tempMax*2]>Utilities[action][attackMax*2]){
+				attackAction = i;
+				attackMax = tempMax;
+			}
+		}
+	}
+	return attackAction;
 }
 
 function LPSolver()
@@ -190,7 +222,7 @@ function LPSolver()
 		var equalOneStr = "";
 		// Create the max string and the equals one
 		for(var j=0; j<Utilities.length; ++j) {
-			if(j!=0 && Utilities[j][i*2]>0) {
+			if(j!=0 && Utilities[j][i*2]>=0) {
 				maxStr += "+";
 			} 
 			if (j!=0) {
@@ -208,7 +240,7 @@ function LPSolver()
 			if(i!=j){
 				for(var t=0; t<Utilities.length; ++t) {
 					var num = (Utilities[t][i*2+1]-Utilities[t][j*2+1]);
-					if(t!=0 && num>0) {
+					if(t!=0 && num>=0) {
 						constraint += "+";
 					} 
 					constraint += num+"x"+(t+1);
@@ -224,7 +256,7 @@ function LPSolver()
 	
 	var maxI = 0;
 	var max = solutions[maxI].max;
-	for(var i=1; i<results.length; ++i) {
+	for(var i=1; i<solutions.length; ++i) {
 		if(max<solutions[i].max) {
 			maxI = i;
 			max = solutions[i].max;
@@ -408,14 +440,14 @@ function Graph(name,legend){
 	this.latestChartLabel = 0;
 }
 
-Graph.prototype.create = function() {
+Graph.prototype.create = function(name1, name2) {
 	var canvas = document.getElementById(this.name),
     ctx = canvas.getContext('2d'),
     startingData = {
       labels: [1],
       datasets: [
           {
-          	  label: "Defender",
+          	  label: name1,
           	  fillColor: "rgba(220,220,220,0.2)",
               strokeColor: "rgba(220,220,220,1)",
               pointColor: "rgba(220,220,220,1)",
@@ -423,7 +455,7 @@ Graph.prototype.create = function() {
               data: [this.attackCount]
           },
           {
-          	  label: "Attacker",
+          	  label: name2,
           	  fillColor: "rgba(151,187,205,0.2)",
               strokeColor: "rgba(151,187,205,1)",
               pointColor: "rgba(151,187,205,1)",
@@ -499,18 +531,19 @@ Graph.prototype.changeGraphAction = function(values) {
 
 Graph.prototype.changeGraphError = function(value) {
 	++this.latestChartLabel;
-	this.defenderCount = value;
 	// Add numbers for each dataset
-	var yAxisSlope = this.defenderCount-this.lastCount;
-	if(this.latestChartLabel < 3000 && 
-		(Math.sign(this.slope)!=Math.sign(yAxisSlope) ||
-		  this.latestChartLabel%100==0)) {
+	var yAxisSlope = value-this.lastCount;
+	if(Math.sign(this.slope)!=Math.sign(yAxisSlope) ||
+		  this.latestChartLabel%100==0) {
 		this.slope = yAxisSlope;
 		var label = "";
 		if(this.latestChartLabel%100==0)
 			label = this.latestChartLabel;
 		this.chart.addData([this.defenderCount], label);
+		if(this.latestChartLabel>500)
+			this.chart.removeData();
 	}
+	this.defenderCount = value;
 	this.lastCount = this.defenderCount;
 }
 
