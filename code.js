@@ -41,7 +41,9 @@ var lastReward = 0;
 var tauValue = .9;
 
 var PAUSED = true;
-var PRINTGRAPHS = false;
+var PRINTGRAPHS = true;
+
+var TestSuiteVar = new TestSuite();
 
 //----- End of Global variables -------//
 
@@ -163,7 +165,6 @@ function startInterval(){
 		  	actionChart.changeGraphAction(actionValues);
 		  	
 		  	rewardDiffChart.changeGraphError(rewardChart.defenderCount - rewardChart.attackCount);
-		  	console.log(rewardChart.latestChartLabel);
 		  	
 		  	var OldMax = Math.max(Math.abs(Math.min(...DefenderUtilities)),
 		  							Math.abs(Math.max(...DefenderUtilities)));
@@ -187,6 +188,12 @@ function startInterval(){
 		  	agent.tau = 1;
 		  	//--- Done with tau learner --/
 		  	lastReward = NewReward;
+		  	
+		  	//If testing suite is being used
+		  	if(TestSuiteVar.CurrentState==TestSuiteVar.Running){
+		  		TestSuiteVar.stateMachine(TestSuiteVar.CurrentState);
+		  	}
+		  	
 		},  IntervalTime);
 	}
 }
@@ -291,6 +298,49 @@ function LPSolver()
 	document.getElementById("solutionModalText").innerHTML = printSolutions(solutions);
 }
 
+function TestSuite(){
+	this.runAmount = 100;
+	this.averageAmount = 10;
+	this.rewardDifference = [];
+	this.optimalError = [];
+	this.Starting = 0;
+	this.Running = 1;
+	this.Stopped = 2;
+	this.CurrentState = this.Stopped;
+}
+
+TestSuite.prototype.stateMachine = function(TestStateInput){
+	switch(TestStateInput) {
+		case this.Starting:
+			this.CurrentState = this.Running;
+			this.rewardDifference = [];
+			this.optimalError = [];
+			restart();
+			break;
+		case this.Running:
+			console.log(rewardChart.latestChartLabel);
+	  		if(this.runAmount == rewardChart.latestChartLabel) {
+				stopInterval();
+	  			this.rewardDifference.push(rewardDiffChart.defenderCount);
+	  			this.optimalError.push(errorChart.defenderCount);
+	  			restart();
+	  		}
+	  		if(this.rewardDifference.length==this.averageAmount){
+	  			var avgReward = average(this.rewardDifference);
+	  			var avgError = average(this.optimalError);
+	  			var stdReward = standardDeviation(this.rewardDifference);
+	  			var stdError = standardDeviation(this.optimalError);
+	  			this.stateMachine(this.Stopped);
+	  		}
+			break;
+		case this.Stopped:
+			this.CurrentState = this.Stopped;
+			break;
+		default:
+			break;
+	}
+}
+
 function stopInterval()
 {
 	if(!PAUSED) {
@@ -337,6 +387,30 @@ function updateUtilities(){
 			AttackerUtilities.push(Utilities[i][j*2+1]);
 		}
 	}
+}
+
+function standardDeviation(values){
+  var avg = average(values);
+  
+  var squareDiffs = values.map(function(value){
+    var diff = value - avg;
+    var sqrDiff = diff * diff;
+    return sqrDiff;
+  });
+  
+  var avgSquareDiff = average(squareDiffs);
+
+  var stdDev = Math.sqrt(avgSquareDiff);
+  return stdDev;
+}
+
+function average(data){
+  var sum = data.reduce(function(sum, value){
+    return sum + value;
+  }, 0);
+
+  var avg = sum / data.length;
+  return avg;
 }
 
 function printArray(values)
