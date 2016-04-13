@@ -22,11 +22,15 @@ var Utilities = [[100,0,-700,700,100,200],
 				[-100,100,100,-200,-100,100],
 				[-100,100,100,-200,100,0]];
 				*/
-				
+/*
 var Utilities = [[100,-200,-700,700,100,-200],
 				[-100,-100,100,-200,-100,-100],
 				[-100,-100,100,-200,100,-200]];
-				
+*/	
+// Very interesting comes to second optimal (Don't change)		
+var Utilities = [[100,-200,-700,700,-100,200],
+				[-100,100,100,-200,-100,100],
+				[-100,100,-100,200,100,-200]];
 
 var Interval;
 var IntervalTime = 0;
@@ -35,6 +39,9 @@ var IntervalTime = 0;
 var Solution = [];
 var lastReward = 0;
 var tauValue = .9;
+
+var PAUSED = true;
+var PRINTGRAPHS = false;
 
 //----- End of Global variables -------//
 
@@ -108,80 +115,80 @@ function start() {
 }
 
 function startInterval(){
-	Interval = setInterval(function(){ // start the learning loop
-		var enterValues = DefenderUtilities.slice();
-		enterValues.push(lastReward);
-		enterValues.push(rewardChart.defenderCount)
-		enterValues.push(tauValue);
-		var action = Number(agent.actRandom(enterValues));
-		var actionProb = agent.amat["w"];
-		
-		//Updating Action Probability Chart
-		changeRadarChart(LearningChart, actionProb);
-		document.getElementById("learningtext").innerText = printArray(actionProb); 
-		
-		//Updating error chart
-		var error = Math.abs(math.sum(...actionProb)-math.sum(...Solution));
-		for(var i=0; i<actionProb.length; ++i){
-			error += Math.abs(actionProb[i]-Solution[i]);
-		}
-	  	errorChart.changeGraphError(error);
-		
-		//var attackAction = Math.floor(Math.random() * (Utilities.length));
-		
-		//Get attackers action
-		var attackAction = attackerAction(actionProb);
-		var optimalAttackAction = attackerAction(Solution);
-		
-		//Optimal solution action
-		var sum=0, r=Math.random(), optimalAction=0;
-		for (var i in Solution) {
-		  sum += Solution[i];
-		  if (r <= sum) {
-			optimalAction = i;
-			break;
-		  }
-		}
-		
-		var rewardValues = [], actionValues = [];
-		//Lets get reward for defender
-	  	var reward = Utilities[action][attackAction*2];
-	  	rewardValues.push(reward);
-		//Geting reward for attack
-	  	//rewardValues.push(Utilities[action][attackAction*2+1]);
-	  	rewardValues.push(Utilities[optimalAction][optimalAttackAction*2]);
-	  	rewardChart.changeGraphReward(rewardValues);
-	  	// Action graph defender than attacker
-	  	actionValues.push((action+1));
-	  	actionValues.push((attackAction+1));
-	  	actionChart.changeGraphAction(actionValues);
-	  	
-	  	rewardDiffChart.changeGraphError(rewardChart.defenderCount - rewardChart.attackCount);
-	  	
-	  	var OldMax = Math.max(Math.abs(Math.min(...DefenderUtilities)),
-	  							Math.abs(Math.max(...DefenderUtilities)));
-	  	var OldMin = -OldMax;
-	  		OldRange = (OldMax - OldMin), NewReward = -1, NewRange = 0;
-	  	var newMax = 1; newMin = -1;
-		if (OldRange != 0) {
-		    NewRange = (newMax - newMin);  
-		    NewReward = (((reward - OldMin) * NewRange) / OldRange) + newMin;
-		}
-	  	// execute action in environment and get the reward
-	  	agent.learn(NewReward); // the agent improves its Q,policy,model, etc. reward is a float
-	  	
-	  	//--- Now we focus on tau learner --//
-	  	var input = [...actionProb, action, lastReward];
-	  	var simpleAction = tauLearner.act(input);
-	  	tauLearner.learn(NewReward);
-	  	tauValue = Math.max(.001,Math.abs(tauLearner.amat["w"][0]));
-	  	//tauValue = Math.max(.001, Math.pow(Math.E,tauLearner.amat["w"][0]*tauLearner.amat["w"][0])-1);
-	  	//console.log(tauValue);
-	  	agent.tau = tauValue;
-	  	//agent.tau = .001;
-	  	//--- Done with tau learner --/
-	  	lastReward = NewReward;
-	},  IntervalTime);
+	if(PAUSED) {
+		PAUSED = false;
+		Interval = setInterval(function(){ // start the learning loop
+			var enterValues = DefenderUtilities.slice();
+			enterValues.push(lastReward);
+			enterValues.push(rewardChart.defenderCount)
+			enterValues.push(tauValue);
+			var action = Number(agent.actRandom(enterValues));
+			var actionProb = agent.amat["w"];
+			
+			//Updating Action Probability Chart
+			changeRadarChart(LearningChart, actionProb);
+			document.getElementById("learningtext").innerText = printArray(actionProb);
+			
+			//Updating error chart
+			var error = Math.abs(math.sum(...actionProb)-math.sum(...Solution));
+			for(var i=0; i<actionProb.length; ++i){
+				error += Math.abs(actionProb[i]-Solution[i]);
+			}
+		  	errorChart.changeGraphError(error);
+			
+			//Get attackers action
+			var attackAction = attackerAction(actionProb);
+			var optimalAttackAction = attackerAction(Solution);
+			
+			//Optimal solution action
+			var sum=0, r=Math.random(), optimalAction=0;
+			for (var i in Solution) {
+			  sum += Solution[i];
+			  if (r <= sum) {
+				optimalAction = i;
+				break;
+			  }
+			}
+			
+			var rewardValues = [], actionValues = [];
+			//Lets get reward for defender
+		  	var reward = Utilities[action][attackAction*2];
+		  	rewardValues.push(reward);
+			//Geting reward for attack
+		  	rewardValues.push(Utilities[optimalAction][optimalAttackAction*2]);
+		  	rewardChart.changeGraphReward(rewardValues);
+		  	// Action graph defender than attacker
+		  	actionValues.push((action+1));
+		  	actionValues.push((attackAction+1));
+		  	actionChart.changeGraphAction(actionValues);
+		  	
+		  	rewardDiffChart.changeGraphError(rewardChart.defenderCount - rewardChart.attackCount);
+		  	console.log(rewardChart.latestChartLabel);
+		  	
+		  	var OldMax = Math.max(Math.abs(Math.min(...DefenderUtilities)),
+		  							Math.abs(Math.max(...DefenderUtilities)));
+		  	var OldMin = -OldMax;
+		  		OldRange = (OldMax - OldMin), NewReward = -1, NewRange = 0;
+		  	var newMax = 1; newMin = -1;
+			if (OldRange != 0) {
+			    NewRange = (newMax - newMin);  
+			    NewReward = (((reward - OldMin) * NewRange) / OldRange) + newMin;
+			}
+		  	// execute action in environment and get the reward
+		  	agent.learn(NewReward); // the agent improves its Q,policy,model, etc. reward is a float
+		  	
+		  	//--- Now we focus on tau learner --//
+		  	var input = [...actionProb, action, lastReward];
+		  	var simpleAction = tauLearner.act(input);
+		  	tauLearner.learn(NewReward);
+		  	tauValue = Math.max(.001,Math.abs(tauLearner.amat["w"][0]));
+		  	//tauValue = Math.max(.001, Math.pow(Math.E,tauLearner.amat["w"][0]*tauLearner.amat["w"][0])-1);
+		  	//agent.tau = tauValue;
+		  	agent.tau = 1;
+		  	//--- Done with tau learner --/
+		  	lastReward = NewReward;
+		},  IntervalTime);
+	}
 }
 
 function attackerAction(actionProb)
@@ -203,7 +210,12 @@ function attackerAction(actionProb)
 			attackAction = i;
 			attackMax = tempMax;
 		} else if(tempMax==attackMax){
-			if(Utilities[action][tempMax*2]>Utilities[action][attackMax*2]){
+			var maxOld=0, maxNew=0;
+			for(var def=0; def<Utilities.length; ++def){
+				maxOld += Utilities[def][attackAction*2]*actionProb[def];
+				maxNew += Utilities[def][i*2]*actionProb[def];
+			}
+			if(maxNew>maxOld){
 				attackAction = i;
 				attackMax = tempMax;
 			}
@@ -279,86 +291,35 @@ function LPSolver()
 	document.getElementById("solutionModalText").innerHTML = printSolutions(solutions);
 }
 
-function learningChart(){
-	var ctx = document.getElementById("learning").getContext("2d");
-	var labelNums = [];
-	var nums = [];
-	for(var i=0; i<Utilities.length; ++i) {
-		labelNums.push(String(i+1));
-		nums.push(1);
-	}
-	if(labelNums.length<3) {
-		labelNums.push("Null");
-		nums.push(0);
-	}
-	var data = {
-	    labels: labelNums,
-	    datasets: [
-	        {
-	            label: "Probabilities",
-	            data: nums
-	        }
-		    ]
-	};
-	LearningChart = new Chart(ctx).Radar(data, {
-	    pointDot: false
-	});
-}
-
-function answerChart(array){
-	var ctx = document.getElementById("solution").getContext("2d");
-	var labelNums = [];
-	for(var i=0; i<array.length; ++i) {
-		labelNums.push(String(i+1));
-	}
-	if(array.length<3) {
-		labelNums.push("Null");
-		array.push(0);
-	}
-	var data = {
-	    labels: labelNums,
-	    datasets: [
-	        {
-	            label: "Probabilities",
-	            data: array
-	        }
-		    ]
-	};
-	SolutionChart = new Chart(ctx).Radar(data, {
-	    pointDot: false
-	});
-}
-
-function changeRadarChart(chart, values)
-{
-	if(values.length<3) {
-		values[2]= 0;
-	}
-	for(var i=0; i<values.length; i++){
-		chart.datasets[0].points[i].value = values[i];
-	}
-	chart.update();
-}
-
 function stopInterval()
 {
-	clearInterval(Interval);
+	if(!PAUSED) {
+		clearInterval(Interval);
+		PAUSED = true;
+	}
 } 
 
 function restart(){
 	stopInterval();
 	// Clearing off all of the graph's data
 	rewardChart.restart();
-	rewardChart.create();
+	rewardChart.create("Defender","Optimal Defender");
 	
 	actionChart.restart();
-	actionChart.create();
+	actionChart.create("Defender","Attacker");
 	
 	errorChart.restart();
 	errorChart.createError();
 	
+	rewardDiffChart.restart();
+	rewardDiffChart.createError();
+	
 	// Starting again
 	start();
+}
+
+function graphsOnOff(){
+	PRINTGRAPHS = !PRINTGRAPHS;
 }
 
 function setUtility(i, j, value){
@@ -426,6 +387,69 @@ function printSolutions(values)
 	}
 	str += "</table></div>";
 	return str;
+}
+
+function learningChart(){
+	var ctx = document.getElementById("learning").getContext("2d");
+	var labelNums = [];
+	var nums = [];
+	for(var i=0; i<Utilities.length; ++i) {
+		labelNums.push(String(i+1));
+		nums.push(1);
+	}
+	if(labelNums.length<3) {
+		labelNums.push("Null");
+		nums.push(0);
+	}
+	var data = {
+	    labels: labelNums,
+	    datasets: [
+	        {
+	            label: "Probabilities",
+	            data: nums
+	        }
+		    ]
+	};
+	LearningChart = new Chart(ctx).Radar(data, {
+	    pointDot: false
+	});
+}
+
+function answerChart(array){
+	var ctx = document.getElementById("solution").getContext("2d");
+	var labelNums = [];
+	for(var i=0; i<array.length; ++i) {
+		labelNums.push(String(i+1));
+	}
+	if(array.length<3) {
+		labelNums.push("Null");
+		array.push(0);
+	}
+	var data = {
+	    labels: labelNums,
+	    datasets: [
+	        {
+	            label: "Probabilities",
+	            data: array
+	        }
+		    ]
+	};
+	SolutionChart = new Chart(ctx).Radar(data, {
+	    pointDot: false
+	});
+}
+
+function changeRadarChart(chart, values)
+{
+	if(PRINTGRAPHS==true){
+		if(values.length<3) {
+			values[2]= 0;
+		}
+		for(var i=0; i<values.length; i++){
+			chart.datasets[0].points[i].value = values[i];
+		}
+		chart.update();
+	}
 }
 
 function Graph(name,legend){
@@ -504,22 +528,23 @@ Graph.prototype.changeGraphReward = function(values) {
 	this.defenderCount += values[0];
 	this.attackCount += values[1];
 	++this.latestChartLabel;
-	// Add numbers for each dataset
-	if(this.latestChartLabel%100==0) {
-		this.chart.addData([this.defenderCount, this.attackCount], this.latestChartLabel);
-		++this.changeGraphCounter;		
+	if(PRINTGRAPHS==true) {
+		// Add numbers for each dataset
+		if(this.latestChartLabel%100==0) {
+			this.chart.addData([this.defenderCount, this.attackCount], this.latestChartLabel);
+			++this.changeGraphCounter;		
+		}
+		// Remove the first point so we dont just add values forever
+		if(this.changeGraphCounter >10 && this.latestChartLabel%100==0)
+			this.chart.removeData();
 	}
-	// Remove the first point so we dont just add values forever
-	if(this.changeGraphCounter >10 && this.latestChartLabel%100==0)
-		this.chart.removeData();
 }
 
 Graph.prototype.changeGraphAction = function(values) {
 	++this.latestChartLabel;
-	if(this.defenderCount==0 || this.attackCount==0 || 
-			this.defenderCount!=values[0] || this.attackCount!=values[1]){
-		this.defenderCount = values[0];
-		this.attackCount = values[1];
+	this.defenderCount = values[0];
+	this.attackCount = values[1];
+	if(PRINTGRAPHS==true) {
 		// Add numbers for each dataset
 		this.chart.addData([this.defenderCount,this.attackCount], this.latestChartLabel);
 		this.changeGraphCounter++;
@@ -531,20 +556,19 @@ Graph.prototype.changeGraphAction = function(values) {
 
 Graph.prototype.changeGraphError = function(value) {
 	++this.latestChartLabel;
-	// Add numbers for each dataset
-	var yAxisSlope = value-this.lastCount;
-	if(Math.sign(this.slope)!=Math.sign(yAxisSlope) ||
-		  this.latestChartLabel%100==0) {
-		this.slope = yAxisSlope;
-		var label = "";
-		if(this.latestChartLabel%100==0)
+	this.defenderCount = value;
+	if(PRINTGRAPHS==true){
+		++this.changeGraphCounter
+		// Add numbers for each dataset
+		if(this.latestChartLabel%100==0){
 			label = this.latestChartLabel;
+		} else {
+			label = "";
+		}
 		this.chart.addData([this.defenderCount], label);
-		if(this.latestChartLabel>500)
+		if(this.changeGraphCounter>300)
 			this.chart.removeData();
 	}
-	this.defenderCount = value;
-	this.lastCount = this.defenderCount;
 }
 
 Graph.prototype.restart = function(value) {
